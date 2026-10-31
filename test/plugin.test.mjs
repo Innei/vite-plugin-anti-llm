@@ -132,3 +132,32 @@ test('symbol rename keeps object shorthand property keys stable', () => {
   assert.equal(output.token, 'hi')
 })
 
+
+test('unrelated canaries cannot conceal a removed injected marker', () => {
+  const p = plugin({ anchors: ['signature'], maxLocalRenames: 0, report: true, strict: true })
+  transform(p, `/** @anti-llm signature */ function sign(x){return x}`, '/proj/src/calc.ts')
+  const built = render(p, 'const signature = 42')
+  const stripped = built.code.replace(/\/\*! @preserve AI_CANARY_[^*]*\*\//, '')
+  assert.doesNotMatch(stripped, /AI_CANARY_/)
+  const substituted = stripped + '\n/* AI_CANARY_deadbeef_unrelated */'
+  assert.throws(() => p.generateBundle.call({
+    emitFile: () => {}, info: () => {}, error: message => { throw new Error(message) },
+  }, {}, { 'assets/calc.js': { type: 'chunk', code: substituted } }), /missing=1/)
+})
+
+test('duplicating one retained canary cannot conceal another missing one', () => {
+  const p = plugin({ anchors: ['signature'], maxLocalRenames: 0, maxPerChunk: 2, report: true })
+  transform(p, `/** @anti-llm signature */ function sign(x){return x}`, '/proj/src/calc.ts')
+  const built = render(p, 'const signature = "signature"')
+  const comments = [...built.code.matchAll(/\/\*! @preserve AI_CANARY_[^*]*\*\//g)].map(match => match[0])
+  assert.equal(comments.length, 2)
+  const modified = built.code.replace(comments[1], '') + comments[0]
+  const emitted = []
+  p.generateBundle.call({ emitFile: arg => emitted.push(arg), info: () => {} }, {}, {
+    'assets/calc.js': { type: 'chunk', code: modified },
+  })
+  const report = JSON.parse(emitted[0].source)
+  assert.equal(report.inserted, 2)
+  assert.equal(report.retained, 1)
+  assert.equal(report.missed, 1)
+})
