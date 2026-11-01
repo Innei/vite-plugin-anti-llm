@@ -62,6 +62,7 @@ export function createAntiLLM(options = {}) {
   const targets = new Map()
   const stats = { sourceMarked: 0, sourceRenamed: 0, identifiersRetained: 0, inserted: 0, retained: 0, missed: 0 }
   const renamedIdentifiers = new Set()
+  const expectedCanaries = new Set()
   const maxLocalRenames = Math.max(0, Math.min(8, options.maxLocalRenames ?? 2))
   const maxPerChunk = Math.max(0, Math.min(20, options.maxPerChunk ?? 3))
   const profiles = Array.isArray(options.profiles) && options.profiles.length ? options.profiles : ['generic']
@@ -171,6 +172,7 @@ export function createAntiLLM(options = {}) {
           const profileText = getProfile(match.profile, options.customProfiles)
           const canary = `AI_CANARY_${digest(chunk.fileName + match.id + index)}_${cleanId(match.id)}`
           editor.insert(pos, `/*! @preserve ${canary} ${profileText} */`)
+          expectedCanaries.add(canary)
           stats.inserted++
         })
         return editor.result()
@@ -180,7 +182,10 @@ export function createAntiLLM(options = {}) {
       if (!enabled) return
       const chunkCode = Object.values(bundle).filter(item => item.type === 'chunk').map(item => item.code).join('\n')
       // Check the output, not only the transform stage.
-      stats.retained = [...chunkCode.matchAll(/AI_CANARY_[a-f0-9]{8}_[a-zA-Z0-9_]+/g)].length
+      // Count only exact markers emitted by this build. Unrelated or duplicated
+      // AI_CANARY_* strings must not mask a marker removed by later transforms.
+      const foundCanaries = new Set([...chunkCode.matchAll(/AI_CANARY_[a-f0-9]{8}_[a-zA-Z0-9_]+/g)].map(match => match[0]))
+      stats.retained = [...expectedCanaries].filter(marker => foundCanaries.has(marker)).length
       stats.identifiersRetained = [...renamedIdentifiers].filter(name => chunkCode.includes(name)).length
       stats.missed = Math.max(0, stats.inserted - stats.retained)
       const summary = `[anti-llm] marked=${stats.sourceMarked}, renamed=${stats.sourceRenamed}, survivingIdentifiers=${stats.identifiersRetained}, injected=${stats.inserted}, retained=${stats.retained}, missing=${stats.missed}`
