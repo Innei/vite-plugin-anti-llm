@@ -78,3 +78,7 @@ Node's built-in test runner checks compile-time macro removal, binding-preservin
 ## Development
 
 Repository: `Innei/vite-plugin-anti-llm` (private). Keep the repository private while experimenting and review any sample payloads as untrusted test data.
+
+### Vite integration smoke test
+
+`npm test` also performs two real, unminified Vite 8 builds of the same algorithm: one with macros removed but without instrumentation, and one with instrumentation enabled. It compares functional outputs, validates the emitted source maps, checks that compile-time markers are absent, and verifies that all reported canaries survive in the final artifact. This is a build-retention test, **not** a measure of whether an AI agent encounters or follows the strings. Minified output and source-map trace accuracy remain separate research tasks.
