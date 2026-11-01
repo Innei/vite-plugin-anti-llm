@@ -83,7 +83,6 @@ test('Oxc-minified build reports actual canary/identifier survival without break
   const baseline = await buildFixture(false, 'oxc')
   const instrumented = await buildFixture(true, 'oxc')
 
-  // The same file names and source maps must be emitted by both builds.
   assert.equal(baseline.jsFilename, 'algorithm.js')
   assert.equal(instrumented.jsFilename, baseline.jsFilename)
   for (const artifact of [baseline, instrumented]) {
@@ -96,8 +95,7 @@ test('Oxc-minified build reports actual canary/identifier survival without break
   assert.doesNotMatch(baseline.js, /AI_CANARY_/)
   assert.ok(instrumented.report.inserted >= 1, 'no canary injection attempted')
 
-  // Legal comments and local identifiers can be removed or moved by a minifier.
-  // Check the emitted result, not the number of attempted transformations.
+  // Minifiers can remove or move comments and local identifiers. Report retention, not assumed success.
   const canariesInOutput = [...instrumented.js.matchAll(/AI_CANARY_[a-f0-9]{8}_[a-zA-Z0-9_]+/g)]
   const renamedInOutput = new Set(
     [...instrumented.js.matchAll(/\b[A-Za-z_$][\w$]*__ai_signature_algorithm_generic_[a-f0-9]{8}\b/g)]
@@ -108,12 +106,15 @@ test('Oxc-minified build reports actual canary/identifier survival without break
   assert.equal(instrumented.report.identifiersRetained, renamedInOutput.size)
   assert.equal(instrumented.report.sourceMapRequested, true)
 
-  // Byte budget for this small fixture; record the signed delta because
-  // optimizers might also eliminate instrumentation entirely.
+  // Bound overhead for the fixture; minification may eliminate some or all instrumentation.
   const byteOverhead = instrumented.bytes - baseline.bytes
-  assert.ok(byteOverhead <= 2048, `unexpected byte overhead: ${byteOverhead}`)
+  assert.ok(byteOverhead <= 2048, 'unexpected byte overhead: ' + byteOverhead)
   assert.ok(instrumented.bytes > 0)
-  console.log(`Oxc retention: ${instrumented.report.retained}/${instrumented.report.inserted} canaries, ${instrumented.report.identifiersRetained}/${instrumented.report.sourceRenamed} identifiers, signed overhead ${byteOverhead} B`)
+  console.log(
+    'Oxc retention: ' + instrumented.report.retained + '/' + instrumented.report.inserted +
+    ' canaries, ' + instrumented.report.identifiersRetained + '/' +
+    instrumented.report.sourceRenamed + ' identifiers; signed overhead ' + byteOverhead + ' B',
+  )
 
   for (const input of ['', ' ABC ', 'fingerprint', 'こんにちは', 'a\nB']) {
     assert.equal(await executeBuilt(instrumented.js, input), await executeBuilt(baseline.js, input))
