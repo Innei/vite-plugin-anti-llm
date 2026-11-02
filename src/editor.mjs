@@ -35,6 +35,8 @@ export class SourceEditor {
     }
     let output = ''
     const offsets = []
+    // Edits need an explicit mapping at their first generated character.
+    const editBoundaries = new Set()
     const emit = (text, origin, retained = false) => {
       output += text
       for (let i = 0; i < text.length; i++) offsets.push(retained ? origin + i : origin)
@@ -42,7 +44,9 @@ export class SourceEditor {
     let cursor = 0
     for (const edit of edits) {
       emit(this.code.slice(cursor, edit.start), cursor, true)
+      editBoundaries.add(output.length)
       emit(edit.text, edit.start)
+      editBoundaries.add(output.length)
       cursor = edit.end
     }
     emit(this.code.slice(cursor), cursor, true)
@@ -77,7 +81,7 @@ export class SourceEditor {
       const originalOffset = offsets[i]
       // One segment per 8 columns in original material, plus edit boundaries.
       const prevOffset = i ? offsets[i - 1] : -1
-      const atEdit = originalOffset !== prevOffset + 1
+      const atEdit = editBoundaries.has(i) || originalOffset !== prevOffset + 1
       if (needsSegment || atEdit || generatedColumn % 8 === 0) {
         if (segments++) mappings += ','
         const nextLine = originalLines[originalOffset]
