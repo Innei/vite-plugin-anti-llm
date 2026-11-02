@@ -23,7 +23,7 @@ function reportFor(p, code) {
     emitFile: file => emitted.push(file),
     info: () => {},
     error: message => { throw new Error(message) },
-  }, {}, { 'assets/calc.js': { type: 'chunk', code } })
+  }, {}, { 'assets/calc.js': { type: 'chunk', fileName: 'assets/calc.js', code } })
   assert.equal(emitted.length, 1)
   return JSON.parse(emitted[0].source)
 }
