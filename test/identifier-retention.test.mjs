@@ -36,7 +36,7 @@ test('quoted, commented, regex and longer-name decoys do not count as surviving 
     `const pattern = /${name}/;`,
     'const template = `' + name + '`;',
     `const ${name}Suffix = 1;`,
-  ].join('\\n')
+  ].join('\n')
   const report = reportFor(p, code)
   assert.equal(report.sourceRenamed, 1)
   assert.equal(report.identifiersRetained, 0)
