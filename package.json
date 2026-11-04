@@ -16,7 +16,8 @@
   ],
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "npm test"
+    "check": "npm test",
+    "benchmark:encounter": "node scripts/benchmark-canary-encounter.mjs"
   },
   "peerDependencies": {
     "vite": ">=5"
