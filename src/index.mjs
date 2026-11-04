@@ -58,6 +58,25 @@ function makeService(file, source) {
   return ts.createLanguageService(host, ts.createDocumentRegistry())
 }
 
+// An emitted identifier must be a real JS AST identifier, not text inside a
+// string, comment, regex literal, template text, or a longer symbol name.
+// Only parse chunks containing a possible match to avoid unnecessary work.
+function countRetainedIdentifiers(chunks, expected) {
+  if (!expected.size) return 0
+  const candidates = [...expected]
+  const retained = new Set()
+  for (const chunk of chunks) {
+    if (!candidates.some(name => chunk.code.includes(name))) continue
+    const source = ts.createSourceFile(chunk.fileName, chunk.code, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS)
+    const visit = node => {
+      if (ts.isIdentifier(node) && expected.has(node.text)) retained.add(node.text)
+      ts.forEachChild(node, visit)
+    }
+    visit(source)
+  }
+  return retained.size
+}
+
 export function createAntiLLM(options = {}) {
   const targets = new Map()
   const stats = { sourceMarked: 0, sourceRenamed: 0, identifiersRetained: 0, inserted: 0, retained: 0, missed: 0 }
@@ -180,13 +199,14 @@ export function createAntiLLM(options = {}) {
     },
     generateBundle(_, bundle) {
       if (!enabled) return
-      const chunkCode = Object.values(bundle).filter(item => item.type === 'chunk').map(item => item.code).join('\n')
+      const chunks = Object.values(bundle).filter(item => item.type === 'chunk')
+      const chunkCode = chunks.map(item => item.code).join('\n')
       // Check the output, not only the transform stage.
       // Count only exact markers emitted by this build. Unrelated or duplicated
       // AI_CANARY_* strings must not mask a marker removed by later transforms.
       const foundCanaries = new Set([...chunkCode.matchAll(/AI_CANARY_[a-f0-9]{8}_[a-zA-Z0-9_]+/g)].map(match => match[0]))
       stats.retained = [...expectedCanaries].filter(marker => foundCanaries.has(marker)).length
-      stats.identifiersRetained = [...renamedIdentifiers].filter(name => chunkCode.includes(name)).length
+      stats.identifiersRetained = countRetainedIdentifiers(chunks, renamedIdentifiers)
       stats.missed = Math.max(0, stats.inserted - stats.retained)
       const summary = `[anti-llm] marked=${stats.sourceMarked}, renamed=${stats.sourceRenamed}, survivingIdentifiers=${stats.identifiersRetained}, injected=${stats.inserted}, retained=${stats.retained}, missing=${stats.missed}`
       if (options.strict && stats.missed) this.error(summary)
