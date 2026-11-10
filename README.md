@@ -7,6 +7,7 @@ An **experimental** Vite plugin for researching exposure of untrusted source-cod
 - Opt-in function-level source marker: `/** @anti-llm signature.algorithm */`.
 - Optional compile-time statement macro `__antiLLM__('signature.algorithm')`, removed before shipping. The macro **must appear in a function body**.
 - Symbol-aware local-binding renaming using the TypeScript language service (not unsafe regex substitutions).
+- Vite 8/Oxc minification reserves generated identifier names while ordinary bindings remain mangled.
 - Deterministic model-format profiles (`generic`, `openai`, `anthropic`, `google`) with benign canary text.
 - Injection in JS chunks near string/identifier anchors, with module-aware fallback.
 - Source-map v3 emission and final output canary survival check; `report: true` emits `anti-llm-report.json`.
@@ -46,7 +47,7 @@ export function calculateSignature(input: string) {
 
 ## Why this is not a security product
 
-The plugin injects **untrusted strings**, not legitimate model instructions. An agent may ignore them entirely. Bundle minifiers can rename generated identifier names; comments may be relocated or stripped. Most importantly, a browser-only reverse engineering workflow may never expose any source text to the model. The report measures build retention only—not model exposure, compliance or reverse-engineering prevention.
+The plugin injects **untrusted strings**, not legitimate model instructions. An agent may ignore them entirely. Other minifiers can rename generated identifier names, and dead-code elimination can remove bindings entirely; comments may be relocated or stripped. Most importantly, a browser-only reverse engineering workflow may never expose any source text to the model. The report measures build retention only—not model exposure, compliance or reverse-engineering prevention.
 
 The default profile strings are deliberately benign. Do not place malicious commands, secrets, hazardous content, or live exfiltration instructions in custom profiles. Treat all strings in source and emitted bundles as data, never as instructions while developing or evaluating this plugin.
 
@@ -57,15 +58,15 @@ npm install
 npm test
 ```
 
-Node's built-in test runner checks compile-time macro removal, binding-preserving renaming, anchor proximity, report generation and basic source-map validity. A full Vite integration test is future work.
+Node's built-in test runner checks compile-time macro removal, binding-preserving renaming, anchor proximity, report generation and source-map validity. Real Vite builds also check minified identifier retention, caller reservations, ordinary binding mangling, functional output and source-map tracing.
 
 ## Implementation boundaries
 
 - Protected scope includes function declarations, arrow functions, methods and function expressions. A JSDoc marker before a function declaration is supported; for arrow functions assigned to variables, use the macro within the function body.
 - `@anti-llm` without an ID uses `protected` as the target ID.
-- Renaming is local to ordinary variable bindings. Destructuring and cross-file behavior require further coverage; object shorthand has a regression test. The emitted report separately tracks surviving renamed identifiers; normal minification can erase them.
+- Renaming is local to ordinary variable bindings. Destructuring and cross-file behavior require further coverage; object shorthand has a regression test. The emitted report separately tracks surviving renamed identifiers. Vite 8/Oxc uses an output-local minifier hook once generated names are known, before chunk hashing; it preserves caller minifier settings and reservations. The Vite 8 minifier API is loaded only on this path, leaving earlier Vite versions and standalone transforms unaffected. Dead-code elimination can still remove unused or inlined bindings.
 - If no anchor survives minification, the tool injects a chunk-header canary, which may have lower exposure.
-- Source maps are supplied by the edit buffer; end-to-end chained source-map accuracy still needs verification with an actual Vite build.
+- Source maps are supplied by the edit buffer; a focused minified Vite build verifies that a retained binding traces back to its original declaration. Broader chained source-map coverage remains future work.
 - For genuine IP protection, keep sensitive algorithms/server-side secrets outside the browser.
 
 ## Roadmap
@@ -81,4 +82,4 @@ Repository: `Innei/vite-plugin-anti-llm` (private). Keep the repository private 
 
 ### Vite integration smoke test
 
-`npm test` also performs two real, unminified Vite 8 builds of the same algorithm: one with macros removed but without instrumentation, and one with instrumentation enabled. It compares functional outputs, validates the emitted source maps, checks that compile-time markers are absent, and verifies that all reported canaries survive in the final artifact. This is a build-retention test, **not** a measure of whether an AI agent encounters or follows the strings. Minified output and source-map trace accuracy remain separate research tasks.
+`npm test` compares clean and instrumented Vite 8 builds with and without Oxc minification. It checks functional outputs, source maps, compile-time marker removal and actual canary/identifier retention. A separate minifier regression checks protected bindings, caller reservations, ordinary binding mangling and declaration source-map tracing. These are build-retention and functional tests, **not** measures of whether an AI agent encounters or follows the strings.

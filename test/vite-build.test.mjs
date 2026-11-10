@@ -104,6 +104,7 @@ test('Oxc-minified build reports actual canary/identifier survival without break
   assert.equal(instrumented.report.retained, canariesInOutput.length)
   assert.equal(instrumented.report.missed, instrumented.report.inserted - instrumented.report.retained)
   assert.equal(instrumented.report.identifiersRetained, renamedInOutput.size)
+  assert.ok(instrumented.report.identifiersRetained > 0, 'Oxc removed all generated identifier names')
   assert.equal(instrumented.report.sourceMapRequested, true)
 
   // Bound overhead for the fixture; minification may eliminate some or all instrumentation.

@@ -99,6 +99,41 @@ export function createAntiLLM(options = {}) {
       enabled = !config.build.ssr && config.mode !== 'test'
       sourcemap = Boolean(config.build.sourcemap)
     },
+    outputOptions(output) {
+      // Rolldown reads output options before transform runs. Minify in an
+      // output-local hook instead, once all generated names are available.
+      if (!enabled || !maxLocalRenames || !output.minify || typeof output.minify === 'string') return null
+      const minify = typeof output.minify === 'object' ? output.minify : {}
+      if (minify.mangle === false) return null
+      const mangle = typeof minify.mangle === 'object' ? minify.mangle : {}
+      const codegen = typeof minify.codegen === 'object' ? minify.codegen : {}
+      return {
+        ...output,
+        minify: false,
+        plugins: [output.plugins, {
+          name: 'anti-llm-minify',
+          renderChunk: {
+            order: 'post',
+            async handler(code, chunk) {
+              // Keep Vite 5-7 and standalone transforms free of Vite 8-only imports.
+              const { minifySync } = await import('vite')
+              const result = minifySync(chunk.fileName, code, {
+                ...minify,
+                module: !output.format || ['es', 'esm', 'module'].includes(output.format),
+                sourcemap: Boolean(output.sourcemap),
+                mangle: { ...mangle, reserved: [...new Set([...(mangle.reserved ?? []), ...renamedIdentifiers])] },
+                codegen: minify.codegen === false ? false : {
+                  ...codegen,
+                  legalComments: codegen.legalComments ?? (output.comments === true || output.comments?.legal ? 'inline' : 'none'),
+                },
+              })
+              if (result.errors.length) this.error(result.errors.map(error => error.message).join('\n'))
+              return { code: result.code, map: result.map ?? null }
+            },
+          },
+        }],
+      }
+    },
     transform(code, id) {
       if (!enabled || !isIncluded(pathname(id))) return null
       const filename = pathname(id)
