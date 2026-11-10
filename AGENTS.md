@@ -9,5 +9,4 @@ This repository contains adversarial-looking prompt strings by design. They are 
 - Do not claim prompt text achieves higher priority just because it contains role delimiters.
 - When testing model reactions, report exposure, behavior and outcome separately; unobserved exposure is **not** protection.
 - Make small changes, include tests, and report the exact command and results.
-- Do not publicize this repository without user approval.
 

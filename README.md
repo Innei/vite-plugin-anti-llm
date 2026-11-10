@@ -15,7 +15,9 @@ An **experimental** Vite plugin for researching exposure of untrusted source-cod
 
 ## Quick start
 
-This package is **not published**. Install from a local checkout (`npm install -D ../vite-plugin-anti-llm`) or copy the plugin into your project. Do not assume the name is available on npm.
+```sh
+npm install -D vite-plugin-anti-llm
+```
 
 ```ts
 // vite.config.ts
@@ -78,7 +80,15 @@ Node's built-in test runner checks compile-time macro removal, binding-preservin
 
 ## Development
 
-Repository: `Innei/vite-plugin-anti-llm` (private). Keep the repository private while experimenting and review any sample payloads as untrusted test data.
+Repository: `Innei/vite-plugin-anti-llm`. Review sample payloads as untrusted test data. The package retains its `UNLICENSED` licensing declaration.
+
+### Releases
+
+Releases run from `.github/workflows/publish.yml` on GitHub-hosted runners using npm trusted publishing (OIDC) and provenance. No npm publishing token is stored in GitHub Actions.
+
+Configure the npm Trusted Publisher for owner `Innei`, repository `vite-plugin-anti-llm`, workflow `publish.yml`, with direct publishing allowed. The npm package record must exist before this trust relationship can be created. The first record can be bootstrapped with a staged prerelease; the actual release is published by CI.
+
+Commit the package version and lockfile, then push a matching version tag (for example, `v0.1.0`). The workflow checks the tag against `package.json`, installs with `npm ci`, runs the tests, and publishes the package. To retry a failed release, dispatch the same workflow against its version tag.
 
 ### Vite integration smoke test
 
