@@ -3,6 +3,8 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { SourceEditor } from './editor.mjs'
 
+export const CANARY_API_VERSION = 1
+
 export const normalizePath = value => value.replaceAll('\\', '/').replace(/\?.*$/, '')
 const hash = value => createHash('sha256').update(value).digest('hex').slice(0, 12)
 const isFunction = node => ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)
@@ -136,7 +138,7 @@ export class CanaryCore {
     return editor.result()
   }
 
-  finalize(code, filename, modules = [...this.targets.keys()], output = this.output) {
+  finalize(code, filename, modules = [...this.targets.keys()], output = this.output, resolveIdentifier) {
     if (this.options.mode === 'off') return null
     const records = [...new Set(modules.map(normalizePath))].flatMap(id => this.targets.get(id) ?? [])
     if (!records.length) return null
@@ -145,11 +147,13 @@ export class CanaryCore {
     const declarations = new Map()
     const mappingPoints = new Set()
     const visit = node => {
-      if (ts.isIdentifier(node) && this.reserved.has(node.text)) mappingPoints.add(node.getStart(source))
-      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && this.reserved.has(node.name.text)) {
+      const resolve = identifier => this.reserved.has(identifier.text) ? identifier.text
+        : resolveIdentifier?.(identifier.getStart(source), source)
+      if (ts.isIdentifier(node) && resolve(node)) mappingPoints.add(node.getStart(source))
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && resolve(node.name)) {
         let parent = node.parent
         while (parent && !isFunction(parent)) parent = parent.parent
-        if (parent?.body && ts.isBlock(parent.body)) declarations.set(node.name.text, parent.body)
+        if (parent?.body && ts.isBlock(parent.body)) declarations.set(resolve(node.name), parent.body)
       }
       ts.forEachChild(node, visit)
     }

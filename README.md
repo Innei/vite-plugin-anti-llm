@@ -4,6 +4,64 @@ An **experimental** Vite plugin for researching exposure of untrusted source-cod
 
 ## Features
 
+### Neutral canary mode
+
+New instrumentation is explicit opt-in and uses fixed, harmless marker text only:
+
+```js
+antiLLM({ mode: 'canary', strict: true, report: true })
+```
+
+`mode: 'off'` removes compile-time selectors/macros without instrumentation. Calls without
+`mode` keep the legacy experiment below unchanged. Canary mode rejects custom profiles,
+does not load external resources, and never calls a model service.
+
+For selected functions, the shared core renames ordinary local bindings to stable opaque
+identifiers, then inserts a comment and an inert string expression inside the emitted
+function after its directive prologue. Minified canary builds require Vite 8/Oxc. The
+final insertion runs after minification and before chunk hashing. Unselected functions
+are not instrumented. A selected function whose bindings were entirely optimized away
+is a location miss, not a successful exposure.
+
+Canary options default to two local renames, both placements enabled, 20 selected
+functions per chunk, 256 inserted bytes per function, and 8192 inserted bytes per chunk.
+The byte budgets cover the inserted static text; full JS/gzip differences also include
+identifier changes and are reported by the local benchmark. `strict` defaults to true:
+missing locations, exhausted budgets, invalid JS or missing final markers fail the build.
+`injectComments`, `injectStrings`, `maxFunctionsPerChunk`, `maxBytesPerFunction`, and
+`maxBytesPerChunk` configure these limits. No raw target IDs, original local names or
+source paths are included in the generated count report.
+
+The esbuild adapter is disabled by default and supports one bundled CJS entry with an
+`outfile` (including `write: false`, sourcemaps and rebuilds):
+
+```js
+import antiLLM from 'vite-plugin-anti-llm/esbuild'
+
+await build({
+  entryPoints: ['src/main.ts'], bundle: true, format: 'cjs', platform: 'node',
+  outfile: 'dist/main.cjs', minify: true,
+  plugins: [antiLLM({ mode: 'canary', report: true })],
+})
+```
+
+Its internal name-minification pass uses a temporary sourcemap to locate selected
+bindings; static markers are inserted afterward. Final maps are composed back to source.
+Transformed esbuild output-file hashes are recomputed using SHA-256. This adapter does
+not support code splitting or multiple entry outputs.
+
+`vite-plugin-anti-llm/inspect` provides `inspectArtifact(file, { root, confirmed: true })`.
+Without confirmation it does not read the file. Confirmed reads stay under the canonical
+compiled root, are limited to `.js`/`.mjs`/`.cjs` and a byte budget, and return only counts
+and bounded extraction metrics. This is a cooperative metadata-only API, **not** human
+authentication or OS isolation; another filesystem tool can bypass it. It never returns
+source excerpts, and its errors do not echo source text or file paths.
+
+Run `npm run benchmark:local` to build and execute the repository's own synthetic
+fixture with neutral mode off/on and compare bounded reads, symbol search, AST slicing
+and comment stripping. Zero encounters stay zero; the benchmark measures neither model
+exposure nor refusal/reconstruction success. It makes no model/API requests.
+
 - Opt-in function-level source marker: `/** @anti-llm signature.algorithm */`.
 - Optional compile-time statement macro `__antiLLM__('signature.algorithm')`, removed before shipping. The macro **must appear in a function body**.
 - Symbol-aware local-binding renaming using the TypeScript language service (not unsafe regex substitutions).

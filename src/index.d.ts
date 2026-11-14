@@ -1,4 +1,6 @@
 import type { Plugin } from 'vite'
+export declare const CANARY_API_VERSION: 1
+export type { CanaryOptions } from './canary-options.js'
 export type ModelProfile = 'generic' | 'openai' | 'anthropic' | 'google' | (string & {})
 export interface AntiLLMOptions {
   /** Explicit safe modes. Omit only for the backwards-compatible legacy experiment. */
