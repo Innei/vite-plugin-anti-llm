@@ -26,9 +26,20 @@ export class CanaryCore {
     if (options.customProfiles !== undefined || options.profiles !== undefined || options.anchors !== undefined) {
       throw new Error('Canary mode does not support custom content or profiles')
     }
-    this.options = { mode: 'canary', maxLocalRenames: 2, ...options }
+    this.options = {
+      mode: 'canary', maxLocalRenames: 2, strict: true,
+      injectComments: true, injectStrings: true,
+      maxFunctionsPerChunk: 20, maxBytesPerFunction: 256, maxBytesPerChunk: 8192,
+      ...options,
+    }
     if (!Number.isInteger(this.options.maxLocalRenames) || this.options.maxLocalRenames < 0 || this.options.maxLocalRenames > 8) {
       throw new Error('Invalid canary option: maxLocalRenames')
+    }
+    for (const key of ['maxFunctionsPerChunk', 'maxBytesPerFunction', 'maxBytesPerChunk']) {
+      if (!Number.isSafeInteger(this.options[key]) || this.options[key] < 0) throw new Error(`Invalid canary option: ${key}`)
+    }
+    for (const key of ['strict', 'injectComments', 'injectStrings']) {
+      if (typeof this.options[key] !== 'boolean') throw new Error(`Invalid canary option: ${key}`)
     }
     this.root = process.cwd()
     this.reset()
@@ -37,6 +48,7 @@ export class CanaryCore {
   reset() {
     this.targets = new Map()
     this.reserved = new Set()
+    this.output = new Map()
   }
 
   transform(code, id) {
@@ -122,5 +134,129 @@ export class CanaryCore {
       if (![...removed].some(([from, to]) => start >= from && start < to)) editor.replace(start, edit.end, edit.text)
     }
     return editor.result()
+  }
+
+  finalize(code, filename, modules = [...this.targets.keys()], output = this.output) {
+    if (this.options.mode === 'off') return null
+    const records = [...new Set(modules.map(normalizePath))].flatMap(id => this.targets.get(id) ?? [])
+    if (!records.length) return null
+    const source = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+    if (source.parseDiagnostics.length) throw new Error('Invalid JavaScript before canary insertion')
+    const declarations = new Map()
+    const mappingPoints = new Set()
+    const visit = node => {
+      if (ts.isIdentifier(node) && this.reserved.has(node.text)) mappingPoints.add(node.getStart(source))
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && this.reserved.has(node.name.text)) {
+        let parent = node.parent
+        while (parent && !isFunction(parent)) parent = parent.parent
+        if (parent?.body && ts.isBlock(parent.body)) declarations.set(node.name.text, parent.body)
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(source)
+    const editor = new SourceEditor(code, filename)
+    // Preserve exact upstream symbol mapping points across the inserted text.
+    for (const position of mappingPoints) editor.insert(position, '')
+    const entries = []
+    let bytes = 0
+    for (const record of records) {
+      const entry = { id: hash(`${filename}:${record.id}`), sourceId: record.id, located: false, comments: 0, strings: 0, bytes: 0 }
+      const body = record.bindings.map(name => declarations.get(name)).find(Boolean)
+      const fail = reason => {
+        if (this.options.strict) throw new Error(`Canary ${reason} for target ${entry.id}`)
+      }
+      if (!body) fail('location missing')
+      else if (entries.filter(item => item.located).length >= this.options.maxFunctionsPerChunk) fail('budget exceeded')
+      else {
+        const comment = this.options.injectComments ? `/*! @preserve AL_CANARY_${entry.id}_C */` : ''
+        const literal = this.options.injectStrings ? `void "AL_CANARY_${entry.id}_S";` : ''
+        const text = comment + literal
+        const size = Buffer.byteLength(text)
+        if (size > this.options.maxBytesPerFunction || bytes + size > this.options.maxBytesPerChunk) fail('budget exceeded')
+        else {
+          // Preserve the full directive prologue, including unknown directives.
+          let position = body.getStart(source) + 1
+          for (const statement of body.statements) {
+            if (!ts.isExpressionStatement(statement) || !ts.isStringLiteral(statement.expression)) break
+            position = statement.end
+          }
+          editor.insert(position, text)
+          Object.assign(entry, { located: true, comments: Number(this.options.injectComments), strings: Number(this.options.injectStrings), bytes: size })
+          bytes += size
+        }
+      }
+      entries.push(entry)
+    }
+    const result = editor.result()
+    if (ts.createSourceFile(filename, result.code, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS).parseDiagnostics.length) {
+      throw new Error('Invalid JavaScript after canary insertion')
+    }
+    output.set(filename, entries)
+    return result
+  }
+
+  verify(chunks, output = this.output) {
+    const functions = []
+    for (const chunk of chunks) {
+      const source = ts.createSourceFile(chunk.fileName, chunk.code, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+      if (source.parseDiagnostics.length) throw new Error('Invalid JavaScript in final canary output')
+      const visit = node => {
+        if (isFunction(node) && node.body && ts.isBlock(node.body)) {
+          const comments = new Set()
+          const strings = new Set()
+          for (const statement of node.body.statements) {
+            const ranges = [
+              ...(ts.getLeadingCommentRanges(chunk.code, statement.pos) ?? []),
+              ...(ts.getTrailingCommentRanges(chunk.code, statement.pos) ?? []),
+            ]
+            for (const range of ranges) {
+              const match = chunk.code.slice(range.pos, range.end).match(/^\/\*! @preserve AL_CANARY_([a-f0-9]{12})_C \*\/$/)
+              if (match) comments.add(match[1])
+            }
+            if (ts.isExpressionStatement(statement) && ts.isVoidExpression(statement.expression)
+              && ts.isStringLiteral(statement.expression.expression)) {
+              const match = statement.expression.expression.text.match(/^AL_CANARY_([a-f0-9]{12})_S$/)
+              if (match) strings.add(match[1])
+            }
+          }
+          functions.push({ comments, strings })
+        }
+        ts.forEachChild(node, visit)
+      }
+      visit(source)
+    }
+    const entries = [...output.values()].flat()
+    let commentsRetained = 0
+    let stringsRetained = 0
+    for (const entry of entries) {
+      const retained = functions.some(item => (!entry.comments || item.comments.has(entry.id))
+        && (!entry.strings || item.strings.has(entry.id)))
+      commentsRetained += Number(entry.comments > 0 && retained)
+      stringsRetained += Number(entry.strings > 0 && retained)
+    }
+    const report = this.report(output)
+    Object.assign(report, { commentsRetained, stringsRetained })
+    if (this.options.strict && report.targetsMissed) throw new Error('Canary location missing in final output')
+    if (this.options.strict && (commentsRetained !== report.commentsInserted || stringsRetained !== report.stringsInserted)) {
+      throw new Error('Canary retention missing in final output')
+    }
+    return report
+  }
+
+  report(output = this.output) {
+    const source = [...this.targets.values()].flat()
+    const entries = [...output.values()].flat()
+    return {
+      schemaVersion: 1, mode: this.options.mode,
+      sourceMarked: source.length,
+      sourceRenamed: source.reduce((sum, record) => sum + record.bindings.length, 0),
+      targetsLocated: entries.filter(entry => entry.located).length,
+      targetsMissed: entries.filter(entry => !entry.located).length
+        + source.filter(record => !entries.some(entry => entry.sourceId === record.id)).length,
+      commentsInserted: entries.reduce((sum, entry) => sum + entry.comments, 0),
+      stringsInserted: entries.reduce((sum, entry) => sum + entry.strings, 0),
+      injectedBytes: entries.reduce((sum, entry) => sum + entry.bytes, 0),
+      caveat: 'Local build retention only; no model service called, no refusal or reconstruction efficacy measured.',
+    }
   }
 }

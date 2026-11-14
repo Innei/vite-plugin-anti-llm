@@ -3,6 +3,13 @@ export type ModelProfile = 'generic' | 'openai' | 'anthropic' | 'google' | (stri
 export interface AntiLLMOptions {
   /** Explicit safe modes. Omit only for the backwards-compatible legacy experiment. */
   mode?: 'off' | 'canary'
+  /** Canary-only final-output placements, enabled by default. */
+  injectComments?: boolean
+  injectStrings?: boolean
+  /** Canary-only budgets. Strict builds fail on misses or budget exhaustion. */
+  maxFunctionsPerChunk?: number
+  maxBytesPerFunction?: number
+  maxBytesPerChunk?: number
   /** Strings that are likely to survive the bundling process, used as injection anchors. */
   anchors?: string[]
   /** How many local variable bindings per marked function to rename. */
