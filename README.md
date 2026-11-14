@@ -67,15 +67,6 @@ fixture with neutral mode off/on and compare bounded reads, symbol search, AST s
 and comment stripping. Zero encounters stay zero; the benchmark measures neither model
 exposure nor refusal/reconstruction success. It makes no model/API requests.
 
-### Lexicon structure
-
-The future lexicon contract lives in [lexicon/README.md](lexicon/README.md): a
-metadata-only JSON Schema, a separate text-resource schema, TypeScript types and a
-sanitized validator exposed as `vite-plugin-anti-llm/lexicon`. The actual catalog
-starts empty; the only resource example is neutral and excluded from npm packing.
-Targets, intended guardrail layers, review state and evaluation evidence are separate
-fields. No raw-resource loader or build activation is added by this contract.
-
 - Opt-in function-level source marker: `/** @anti-llm signature.algorithm */`.
 - Optional compile-time statement macro `__antiLLM__('signature.algorithm')`, removed before shipping. The macro **must appear in a function body**.
 - Symbol-aware local-binding renaming using the TypeScript language service (not unsafe regex substitutions).
@@ -84,6 +75,15 @@ fields. No raw-resource loader or build activation is added by this contract.
 - Injection in JS chunks near string/identifier anchors, with module-aware fallback.
 - Source-map v3 emission and final output canary survival check; `report: true` emits `anti-llm-report.json`.
 - No network requests, no subprocess execution, no filesystem collection, no runtime data access.
+
+### Lexicon structure
+
+The future lexicon contract lives in [lexicon/README.md](lexicon/README.md): a
+metadata-only JSON Schema, a separate text-resource schema, TypeScript types and a
+sanitized validator exposed as `vite-plugin-anti-llm/lexicon`. The actual catalog
+starts empty; the only resource example is neutral and excluded from npm packing.
+Targets, intended guardrail layers, review state and evaluation evidence are separate
+fields. No raw-resource loader or build activation is added by this contract.
 
 ## Quick start
 
