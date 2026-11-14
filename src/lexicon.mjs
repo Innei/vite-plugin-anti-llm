@@ -8,22 +8,16 @@ const ajv = new Ajv2020({ strict: true, allErrors: false, coerceTypes: false, us
 addFormats(ajv, ['date-time'])
 const validate = ajv.compile(schema)
 
-/** Metadata only: never resolves resource IDs or opens resource files. */
+/** Validates a self-contained catalog as data; performs no resource lookup or I/O. */
 export function validateLexiconManifest(value) {
   if (!validate(value)) return {
     valid: false,
     issues: (validate.errors ?? []).map(error => ({ path: error.instancePath || '/', code: error.keyword })),
   }
   const entries = new Set()
-  const resources = new Map()
   for (const [index, entry] of value.entries.entries()) {
     if (entries.has(entry.id)) return { valid: false, issues: [{ path: `/entries/${index}/id`, code: 'duplicate-entry-id' }] }
     entries.add(entry.id)
-    const integrity = `${entry.integrity.bytes}:${entry.integrity.sha256}`
-    if (resources.has(entry.resourceId) && resources.get(entry.resourceId) !== integrity) {
-      return { valid: false, issues: [{ path: `/entries/${index}/integrity`, code: 'conflicting-resource-integrity' }] }
-    }
-    resources.set(entry.resourceId, integrity)
   }
   return { valid: true, issues: [] }
 }

@@ -79,11 +79,11 @@ exposure nor refusal/reconstruction success. It makes no model/API requests.
 ### Lexicon structure
 
 The future lexicon contract lives in [lexicon/README.md](lexicon/README.md): a
-metadata-only JSON Schema, a separate text-resource schema, TypeScript types and a
-sanitized validator exposed as `vite-plugin-anti-llm/lexicon`. The actual catalog
-starts empty; the only resource example is neutral and excluded from npm packing.
+single-file JSON catalog with inline text, a JSON Schema, TypeScript types and a
+sanitized validator exposed as `vite-plugin-anti-llm/lexicon`. The generic catalog
+starts empty; a self-contained neutral example is included in npm packing.
 Targets, intended guardrail layers, review state and evaluation evidence are separate
-fields. No raw-resource loader or build activation is added by this contract.
+fields. No catalog loading or build activation is added by this contract.
 
 ## Quick start
 

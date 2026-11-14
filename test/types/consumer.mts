@@ -18,16 +18,16 @@ inspectArtifact('/compiled/example.cjs', { root: '/compiled', confirmed: false }
 })
 
 const draft: LexiconEntry = {
-  id: 'n001', revision: 1, resourceId: 'r001', enabled: false,
+  id: 'n001', revision: 1, text: 'NEUTRAL_SAMPLE_示例', enabled: false,
   category: 'retention-canary', intendedLayer: 'unknown', locale: 'und',
   placements: ['function-comment'],
   targets: [{ kind: 'agent', id: 'unspecified', family: 'unspecified' }],
   review: { status: 'draft' },
-  integrity: { encoding: 'utf-8', bytes: 3, sha256: 'a'.repeat(64) },
   evaluation: { status: 'not-tested', evidenceIds: [] },
 }
 const manifest: LexiconManifest = { schemaVersion: 1, catalogId: 'types', revision: 1, entries: [draft] }
 const parsed = parseLexiconManifest(JSON.stringify(manifest))
+parsed.entries[0].text.toUpperCase()
 const checked = validateLexiconManifest(parsed)
 if (!checked.valid) checked.issues.forEach(issue => issue.path.toLowerCase())
 

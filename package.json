@@ -31,7 +31,6 @@
       "default": "./src/lexicon.mjs"
     },
     "./lexicon/manifest.schema.json": "./lexicon/manifest.schema.json",
-    "./lexicon/resource.schema.json": "./lexicon/resource.schema.json",
     "./lexicon/manifest.json": "./lexicon/manifest.json"
   },
   "files": [
