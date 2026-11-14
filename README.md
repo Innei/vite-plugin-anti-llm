@@ -20,7 +20,10 @@ For selected functions, the shared core renames ordinary local bindings to stabl
 identifiers, then inserts a comment and an inert string expression inside the emitted
 function after its directive prologue. Minified canary builds require Vite 8/Oxc. The
 final insertion runs after minification and before chunk hashing. Unselected functions
-are not instrumented. A selected function whose bindings were entirely optimized away
+are not instrumented. Bindings used to infer anonymous callable/class names are excluded
+from renaming, including later assignments and transparent TypeScript wrappers. The
+manual minifier respects the effective Vite transform target and stricter caller
+compression targets. A selected function whose bindings were entirely optimized away
 is a location miss, not a successful exposure.
 Caller inline/EOF legal-comment policy is preserved; external legal-comment extraction
 is rejected explicitly because this adapter does not emit a companion license file.

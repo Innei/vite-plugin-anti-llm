@@ -10,6 +10,14 @@ const hash = value => createHash('sha256').update(value).digest('hex').slice(0, 
 const isFunction = node => ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)
   || ts.isArrowFunction(node) || ts.isMethodDeclaration(node)
 
+function infersName(expression) {
+  while (expression && (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression) || ts.isSatisfiesExpression(expression)
+    || ts.isNonNullExpression(expression))) expression = expression.expression
+  return expression && (ts.isArrowFunction(expression)
+    || (ts.isFunctionExpression(expression) || ts.isClassExpression(expression)) && !expression.name)
+}
+
 function serviceFor(filename, code) {
   return ts.createLanguageService({
     getScriptFileNames: () => [filename],
@@ -61,7 +69,14 @@ export class CanaryCore {
       /\.[jt]sx$/.test(filename) ? ts.ScriptKind.TSX : /\.jsx?$/.test(filename) ? ts.ScriptKind.JS : ts.ScriptKind.TS)
     const selected = []
     const removed = new Map()
+    const inferredNames = new Set()
     const visit = node => {
+      if ((ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isBindingElement(node))
+        && ts.isIdentifier(node.name) && infersName(node.initializer)) inferredNames.add(node.name.getStart(source))
+      if (ts.isShorthandPropertyAssignment(node) && infersName(node.objectAssignmentInitializer)) inferredNames.add(node.name.getStart(source))
+      if (ts.isBinaryExpression(node) && ts.isIdentifier(node.left) && infersName(node.right)
+        && [ts.SyntaxKind.EqualsToken, ts.SyntaxKind.BarBarEqualsToken, ts.SyntaxKind.AmpersandAmpersandEqualsToken,
+          ts.SyntaxKind.QuestionQuestionEqualsToken].includes(node.operatorToken.kind)) inferredNames.add(node.left.getStart(source))
       if (isFunction(node) && node.body) {
         const comments = ts.getLeadingCommentRanges(code, node.getFullStart()) ?? []
         let targetId
@@ -113,11 +128,12 @@ export class CanaryCore {
         }
         ts.forEachChild(node.body, collect)
         const bindings = []
-        for (const identifier of locals.slice(0, this.options.maxLocalRenames)) {
+        for (const identifier of locals) {
+          if (bindings.length >= this.options.maxLocalRenames) break
           let renamed = `__al_${hash(`${opaque}:${identifier.pos}`)}`
           while (code.includes(renamed)) renamed += '_'
           const uses = service?.findRenameLocations(filename, identifier.getStart(source), false, false, true) ?? []
-          if (!uses.length) continue
+          if (!uses.length || uses.some(use => normalizePath(use.fileName) === filename && inferredNames.has(use.textSpan.start))) continue
           for (const use of uses) {
             if (normalizePath(use.fileName) !== filename) continue
             const { start, length } = use.textSpan

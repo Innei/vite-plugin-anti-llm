@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { SourceMap } from 'node:module'
 import { createHash } from 'node:crypto'
@@ -8,6 +8,23 @@ import remapping from '@jridgewell/remapping'
 import { CanaryCore } from './canary.mjs'
 
 export { CANARY_API_VERSION } from './canary.mjs'
+
+// write:false may leave the output directory nonexistent. Resolve the nearest
+// existing ancestor so alias paths compare correctly without creating files.
+async function canonicalOutput(filename) {
+  let ancestor = filename
+  const suffix = []
+  for (;;) {
+    try { return path.join(await realpath(ancestor), ...suffix.toReversed()) }
+    catch (error) {
+      if (!['ENOENT', 'ENOTDIR'].includes(error.code) || path.dirname(ancestor) === ancestor) {
+        throw new Error('Canary output path resolution failed')
+      }
+      suffix.push(path.basename(ancestor))
+      ancestor = path.dirname(ancestor)
+    }
+  }
+}
 
 function outputFile(filename, text) {
   const contents = Buffer.from(text)
@@ -75,11 +92,13 @@ export function createAntiLLMEsbuild(options = {}) {
       if (mode === 'off') return
       build.onEnd(async result => {
         if (result.errors.length) return
-        const outfile = path.resolve(core.root, initial.outfile)
+        const expected = await canonicalOutput(path.resolve(core.root, initial.outfile))
         const files = result.outputFiles ?? []
-        const javascript = files.find(file => file.path === outfile)
+        const locations = await Promise.all(files.map(file => canonicalOutput(file.path)))
+        const javascript = files.find((file, index) => locations[index] === expected)
         if (!javascript) throw new Error('Canary CJS output missing')
-        const mapFile = files.find(file => file.path === outfile + '.map')
+        const outfile = javascript.path
+        const mapFile = files.find((file, index) => locations[index] === expected + '.map')
         let code = javascript.text
         let map = mapFile ? JSON.parse(mapFile.text) : null
         let resolveIdentifier
@@ -106,7 +125,7 @@ export function createAntiLLMEsbuild(options = {}) {
         } else if (map && requestedMap !== 'external') {
           code += `\n//# sourceMappingURL=${path.basename(outfile)}.map\n`
         }
-        const output = files.filter(file => file.path !== outfile && file.path !== outfile + '.map')
+        const output = files.filter((file, index) => locations[index] !== expected && locations[index] !== expected + '.map')
         output.push(outputFile(outfile, code))
         if (map && requestedMap !== 'inline') output.push(outputFile(outfile + '.map', JSON.stringify(map)))
         if (options.report) output.push(outputFile(path.join(path.dirname(outfile), 'anti-llm-report.json'), JSON.stringify(report, null, 2)))
