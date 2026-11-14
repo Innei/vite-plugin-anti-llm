@@ -22,6 +22,8 @@ function after its directive prologue. Minified canary builds require Vite 8/Oxc
 final insertion runs after minification and before chunk hashing. Unselected functions
 are not instrumented. A selected function whose bindings were entirely optimized away
 is a location miss, not a successful exposure.
+Caller inline/EOF legal-comment policy is preserved; external legal-comment extraction
+is rejected explicitly because this adapter does not emit a companion license file.
 
 Canary options default to two local renames, both placements enabled, 20 selected
 functions per chunk, 256 inserted bytes per function, and 8192 inserted bytes per chunk.
