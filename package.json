@@ -17,27 +17,54 @@
     ".": {
       "types": "./src/index.d.ts",
       "default": "./src/index.mjs"
-    }
+    },
+    "./esbuild": {
+      "types": "./src/esbuild.d.ts",
+      "default": "./src/esbuild.mjs"
+    },
+    "./inspect": {
+      "types": "./src/inspect.d.ts",
+      "default": "./src/inspect.mjs"
+    },
+    "./lexicon": {
+      "types": "./src/lexicon.d.ts",
+      "default": "./src/lexicon.mjs"
+    },
+    "./lexicon/manifest.schema.json": "./lexicon/manifest.schema.json",
+    "./lexicon/resource.schema.json": "./lexicon/resource.schema.json",
+    "./lexicon/manifest.json": "./lexicon/manifest.json"
   },
   "files": [
     "src",
+    "lexicon/*.schema.json",
+    "lexicon/README.md",
+    "lexicon/examples/manifest.json",
+    "lexicon/manifest.json",
     "README.md",
     "SECURITY.md"
   ],
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "check": "npm test",
-    "benchmark:encounter": "node scripts/benchmark-canary-encounter.mjs"
+    "benchmark:encounter": "node scripts/benchmark-canary-encounter.mjs",
+    "benchmark:local": "node scripts/benchmark-canary-local.mjs"
   },
   "peerDependencies": {
+    "esbuild": ">=0.25",
     "vite": ">=5"
   },
   "peerDependenciesMeta": {
+    "esbuild": {
+      "optional": true
+    },
     "vite": {
       "optional": true
     }
   },
   "dependencies": {
+    "@jridgewell/remapping": "^2.3.5",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "typescript": "^5.8.3"
   },
   "engines": {
@@ -45,6 +72,7 @@
   },
   "license": "UNLICENSED",
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "vite": "8.3.5"
   }
 }
