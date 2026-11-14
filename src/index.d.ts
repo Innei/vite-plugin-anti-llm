@@ -1,6 +1,8 @@
 import type { Plugin } from 'vite'
 export type ModelProfile = 'generic' | 'openai' | 'anthropic' | 'google' | (string & {})
 export interface AntiLLMOptions {
+  /** Explicit safe modes. Omit only for the backwards-compatible legacy experiment. */
+  mode?: 'off' | 'canary'
   /** Strings that are likely to survive the bundling process, used as injection anchors. */
   anchors?: string[]
   /** How many local variable bindings per marked function to rename. */
