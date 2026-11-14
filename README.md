@@ -152,6 +152,16 @@ Node's built-in test runner checks compile-time macro removal, binding-preservin
 
 ## Development
 
+The runtime imports `typescript` through the official `@typescript/typescript6`
+compatibility package: TypeScript 7.0 does not provide the JavaScript compiler and
+language-service API used for AST transforms. The native TypeScript 7 CLI is a
+separate development dependency (`@typescript/native` alias), so `tsc` and `tsc6`
+do not conflict. See the [official side-by-side guidance](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6-0).
+
+Run `npm run typecheck` to check every public adapter/inspection/lexicon declaration
+with the native compiler, and `npm test` to exercise the runtime compiler API and
+actual bundler integrations. The native compiler is not a production dependency.
+
 Repository: `Innei/vite-plugin-anti-llm`. Review sample payloads as untrusted test data. The package retains its `UNLICENSED` licensing declaration.
 
 ### Releases

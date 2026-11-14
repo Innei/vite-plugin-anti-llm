@@ -47,7 +47,8 @@
     "test": "node --test test/*.test.mjs",
     "check": "npm test",
     "benchmark:encounter": "node scripts/benchmark-canary-encounter.mjs",
-    "benchmark:local": "node scripts/benchmark-canary-local.mjs"
+    "benchmark:local": "node scripts/benchmark-canary-local.mjs",
+    "typecheck": "tsc --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2022 --skipLibCheck test/types/consumer.mts"
   },
   "peerDependencies": {
     "esbuild": ">=0.25",
@@ -65,7 +66,7 @@
     "@jridgewell/remapping": "^2.3.5",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
-    "typescript": "^5.8.3"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "engines": {
     "node": ">=20"
@@ -73,6 +74,7 @@
   "license": "UNLICENSED",
   "devDependencies": {
     "esbuild": "^0.28.2",
-    "vite": "8.3.5"
+    "vite": "8.3.5",
+    "@typescript/native": "npm:typescript@^7.0.2"
   }
 }
