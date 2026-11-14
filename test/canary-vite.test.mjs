@@ -99,3 +99,29 @@ test('canary minification preserves the caller legal-comment policy', async () =
 test('external legal-comment extraction is rejected instead of losing the companion file', async () => {
   await assert.rejects(fixture({}, source, 'oxc', { minify: { codegen: { legalComments: 'external' } } }), /legal.comment/i)
 })
+
+test('hashed lazy chunks stay deterministic and executable after final insertion', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'canary-chunks-'))
+  try {
+    const entry = path.join(root, 'entry.js')
+    await writeFile(entry, 'export async function load(values) { return (await import("./lazy.js")).sum(values); }')
+    await writeFile(path.join(root, 'lazy.js'), source)
+    const outputs = []
+    for (const [index, mode] of ['off', 'canary', 'canary'].entries()) {
+      const outDir = path.join(root, 'build-' + index)
+      const result = await build({ root, configFile: false, logLevel: 'silent',
+        plugins: [antiLLM({ mode, strict: true, report: true })],
+        build: { outDir, minify: 'oxc', sourcemap: true,
+          rolldownOptions: { input: entry, preserveEntrySignatures: 'strict', output: { format: 'es', entryFileNames: '[name]-[hash].mjs', chunkFileNames: '[name]-[hash].mjs' } } },
+      })
+      const chunks = (Array.isArray(result) ? result : [result]).flatMap(result => result.output).filter(item => item.type === 'chunk')
+      const main = chunks.find(item => item.isEntry)
+      const { pathToFileURL } = await import('node:url')
+      const compiled = await import(pathToFileURL(path.join(outDir, main.fileName)).href)
+      assert.equal(await compiled.load([2, 3]), 10)
+      outputs.push(chunks.map(item => item.fileName).sort())
+    }
+    assert.notDeepEqual(outputs[0], outputs[1])
+    assert.deepEqual(outputs[1], outputs[2])
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
