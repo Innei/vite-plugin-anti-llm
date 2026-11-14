@@ -6,6 +6,7 @@ import path from 'node:path'
 import { SourceMap } from 'node:module'
 import { build } from 'vite'
 import antiLLM from '../src/index.mjs'
+import { SourceEditor } from '../src/editor.mjs'
 
 const source = `/** @anti-llm internal_sum */
 export function sum(values) {
@@ -16,15 +17,15 @@ export function sum(values) {
 }
 export function untouched(value) { return value + 9; }`
 
-async function fixture(options = {}, code = source, minify = 'oxc') {
+async function fixture(options = {}, code = source, minify = 'oxc', outputOptions, extraPlugins = []) {
   const root = await mkdtemp(path.join(tmpdir(), 'canary-vite-'))
   try {
     const entry = path.join(root, 'entry.js')
     await writeFile(entry, code)
     const result = await build({ root, configFile: false, logLevel: 'silent',
-      plugins: [antiLLM({ mode: 'canary', strict: true, report: true, ...options })],
+      plugins: [antiLLM({ mode: 'canary', strict: true, report: true, ...options }), ...extraPlugins],
       build: { write: false, minify, sourcemap: true,
-        lib: { entry, formats: ['es'], fileName: () => 'bundle.mjs' } },
+        lib: { entry, formats: ['es'], fileName: () => 'bundle.mjs' }, rolldownOptions: { output: outputOptions } },
     })
     const output = (Array.isArray(result) ? result : [result]).flatMap(result => result.output)
     const chunk = output.find(item => item.type === 'chunk')
@@ -81,4 +82,20 @@ test('unminified builds insert after directives and strict script behavior stays
   const compiled = await execute(built.code)
   assert.equal(compiled.sum([2, 3]), 10)
   assert.match(compiled.sum.toString(), /AL_CANARY/)
+})
+
+
+test('canary minification preserves the caller legal-comment policy', async () => {
+  const license = { name: 'fixture-license', renderChunk(code, chunk) {
+    const editor = new SourceEditor(code, chunk.fileName)
+    editor.insert(0, '/*! @license NEUTRAL_FIXTURE_LICENSE */\n')
+    return editor.result()
+  } }
+  const built = await fixture({}, source, 'oxc', { comments: { legal: true } }, [license])
+  assert.match(built.code, /NEUTRAL_FIXTURE_LICENSE/)
+  assert.equal((await execute(built.code)).sum([2, 3]), 10)
+})
+
+test('external legal-comment extraction is rejected instead of losing the companion file', async () => {
+  await assert.rejects(fixture({}, source, 'oxc', { minify: { codegen: { legalComments: 'external' } } }), /legal.comment/i)
 })

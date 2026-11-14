@@ -32,10 +32,20 @@ export function createCanaryVite(options) {
                 const { minifySync } = await import('vite')
                 const settings = typeof minify === 'object' ? minify : {}
                 const mangle = typeof settings.mangle === 'object' ? settings.mangle : {}
+                const codegen = typeof settings.codegen === 'object' ? settings.codegen : {}
+                const legalComments = codegen.legalComments ?? (output.comments === true || output.comments?.legal ? 'inline' : 'none')
+                if (legalComments === 'external' || typeof legalComments === 'object') {
+                  throw new Error('Canary output does not support external legal-comment files')
+                }
                 const result = minifySync(chunk.fileName, code, {
                   ...settings, module: !output.format || ['es', 'esm', 'module'].includes(output.format),
                   sourcemap: Boolean(output.sourcemap),
                   mangle: settings.mangle === false ? false : { ...mangle, reserved: [...new Set([...(mangle.reserved ?? []), ...core.reserved])] },
+                  codegen: {
+                    ...codegen,
+                    removeWhitespace: codegen.removeWhitespace ?? settings.codegen !== false,
+                    legalComments,
+                  },
                 })
                 if (result.errors.length) throw new Error('Canary minification failed')
                 code = result.code
