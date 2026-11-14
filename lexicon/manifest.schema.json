@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:anti-llm:lexicon:manifest:1",
+  "title": "Anti-LLM lexicon metadata manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "catalogId",
+    "revision",
+    "entries"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "catalogId": {
+      "$ref": "#/$defs/id"
+    },
+    "revision": {
+      "$ref": "#/$defs/revision"
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision",
+        "resourceId",
+        "enabled",
+        "category",
+        "intendedLayer",
+        "locale",
+        "placements",
+        "targets",
+        "review",
+        "integrity",
+        "evaluation"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "revision": {
+          "$ref": "#/$defs/revision"
+        },
+        "resourceId": {
+          "$ref": "#/$defs/id"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Selection metadata only; not a build activation or authorization token."
+        },
+        "category": {
+          "enum": [
+            "retention-canary",
+            "analysis-notice",
+            "semantic-noise",
+            "instruction-redirection",
+            "context-noise",
+            "policy-sensitivity"
+          ]
+        },
+        "intendedLayer": {
+          "enum": [
+            "agent",
+            "model",
+            "api",
+            "unknown"
+          ],
+          "description": "Hypothesis about the intended layer, not measured attribution."
+        },
+        "locale": {
+          "type": "string",
+          "maxLength": 35,
+          "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$"
+        },
+        "placements": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "function-comment",
+              "function-string",
+              "local-name"
+            ]
+          }
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "id",
+              "family"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "agent",
+                  "model",
+                  "provider"
+                ]
+              },
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "family": {
+                "enum": [
+                  "international",
+                  "domestic",
+                  "unspecified"
+                ]
+              }
+            }
+          }
+        },
+        "review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "draft",
+                "approved",
+                "rejected"
+              ]
+            },
+            "reviewerId": {
+              "$ref": "#/$defs/id"
+            },
+            "reviewedAt": {
+              "type": "string",
+              "maxLength": 40,
+              "format": "date-time"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "approved",
+                      "rejected"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "required": [
+                  "reviewerId",
+                  "reviewedAt"
+                ],
+                "properties": {
+                  "reviewerId": {},
+                  "reviewedAt": {}
+                }
+              }
+            }
+          ]
+        },
+        "integrity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "encoding",
+            "bytes",
+            "sha256"
+          ],
+          "properties": {
+            "encoding": {
+              "const": "utf-8"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1048576
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "evaluation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "evidenceIds"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "not-tested",
+                "retention-only",
+                "observed"
+              ]
+            },
+            "evidenceIds": {
+              "type": "array",
+              "maxItems": 16,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              }
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "not-tested"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "evidenceIds": {
+                    "type": "array",
+                    "maxItems": 0
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "evidenceIds": {
+                    "type": "array",
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          },
+          "then": {
+            "properties": {
+              "review": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "approved"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

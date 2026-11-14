@@ -1,6 +1,17 @@
 import type { Plugin } from 'vite'
+export declare const CANARY_API_VERSION: 1
+export type { CanaryOptions } from './canary-options.js'
 export type ModelProfile = 'generic' | 'openai' | 'anthropic' | 'google' | (string & {})
 export interface AntiLLMOptions {
+  /** Explicit safe modes. Omit only for the backwards-compatible legacy experiment. */
+  mode?: 'off' | 'canary'
+  /** Canary-only final-output placements, enabled by default. */
+  injectComments?: boolean
+  injectStrings?: boolean
+  /** Canary-only budgets. Strict builds fail on misses or budget exhaustion. */
+  maxFunctionsPerChunk?: number
+  maxBytesPerFunction?: number
+  maxBytesPerChunk?: number
   /** Strings that are likely to survive the bundling process, used as injection anchors. */
   anchors?: string[]
   /** How many local variable bindings per marked function to rename. */

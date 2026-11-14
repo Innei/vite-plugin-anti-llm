@@ -1,33 +1,70 @@
 {
   "name": "vite-plugin-anti-llm",
   "version": "0.1.0",
-  "private": true,
   "description": "Experimental build-time AI reverse-engineering exposure research plugin for Vite",
+  "author": "Innei",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Innei/vite-plugin-anti-llm.git"
+  },
+  "homepage": "https://github.com/Innei/vite-plugin-anti-llm#readme",
+  "bugs": "https://github.com/Innei/vite-plugin-anti-llm/issues",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "exports": {
     ".": {
       "types": "./src/index.d.ts",
       "default": "./src/index.mjs"
-    }
+    },
+    "./esbuild": {
+      "types": "./src/esbuild.d.ts",
+      "default": "./src/esbuild.mjs"
+    },
+    "./inspect": {
+      "types": "./src/inspect.d.ts",
+      "default": "./src/inspect.mjs"
+    },
+    "./lexicon": {
+      "types": "./src/lexicon.d.ts",
+      "default": "./src/lexicon.mjs"
+    },
+    "./lexicon/manifest.schema.json": "./lexicon/manifest.schema.json",
+    "./lexicon/resource.schema.json": "./lexicon/resource.schema.json",
+    "./lexicon/manifest.json": "./lexicon/manifest.json"
   },
   "files": [
     "src",
-    "README.md"
+    "lexicon/*.schema.json",
+    "lexicon/README.md",
+    "lexicon/examples/manifest.json",
+    "lexicon/manifest.json",
+    "README.md",
+    "SECURITY.md"
   ],
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "check": "npm test",
-    "benchmark:encounter": "node scripts/benchmark-canary-encounter.mjs"
+    "benchmark:encounter": "node scripts/benchmark-canary-encounter.mjs",
+    "benchmark:local": "node scripts/benchmark-canary-local.mjs"
   },
   "peerDependencies": {
+    "esbuild": ">=0.25",
     "vite": ">=5"
   },
   "peerDependenciesMeta": {
+    "esbuild": {
+      "optional": true
+    },
     "vite": {
       "optional": true
     }
   },
   "dependencies": {
+    "@jridgewell/remapping": "^2.3.5",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "typescript": "^7.0.2"
   },
   "engines": {
@@ -35,6 +72,7 @@
   },
   "license": "UNLICENSED",
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "vite": "8.3.5"
   }
 }
