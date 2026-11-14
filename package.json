@@ -25,10 +25,21 @@
     "./inspect": {
       "types": "./src/inspect.d.ts",
       "default": "./src/inspect.mjs"
-    }
+    },
+    "./lexicon": {
+      "types": "./src/lexicon.d.ts",
+      "default": "./src/lexicon.mjs"
+    },
+    "./lexicon/manifest.schema.json": "./lexicon/manifest.schema.json",
+    "./lexicon/resource.schema.json": "./lexicon/resource.schema.json",
+    "./lexicon/manifest.json": "./lexicon/manifest.json"
   },
   "files": [
     "src",
+    "lexicon/*.schema.json",
+    "lexicon/README.md",
+    "lexicon/examples/manifest.json",
+    "lexicon/manifest.json",
     "README.md",
     "SECURITY.md"
   ],
@@ -52,6 +63,8 @@
   },
   "dependencies": {
     "@jridgewell/remapping": "^2.3.5",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "typescript": "^5.8.3"
   },
   "engines": {
